@@ -44,6 +44,7 @@ test("accepted orders produce an email notification", async () => {
     body: JSON.stringify({
       orderId: "order-123",
       customerEmail: "buyer@example.test",
+      priority: "normal",
     }),
   });
   const body: unknown = await response.json();
@@ -84,6 +85,7 @@ test("orders require a JSON request", async () => {
     body: JSON.stringify({
       orderId: "order-123",
       customerEmail: "buyer@example.test",
+      priority: "normal",
     }),
   });
 
@@ -91,6 +93,42 @@ test("orders require a JSON request", async () => {
     { status: response.status, body: await response.json() },
     { status: 415, body: { error: "unsupported_media_type" } },
   );
+});
+
+test("urgent orders are delivered before normal orders", async () => {
+  const queueDirectory = await mkdtemp(join(tmpdir(), "orders-demo-test-"));
+  const queue = new FileOrderEventQueue(queueDirectory);
+
+  cleanups.push(async () => {
+    await rm(queueDirectory, { recursive: true, force: true });
+  });
+
+  await queue.publish({
+    eventId: "normal-event",
+    type: "order.accepted",
+    schemaVersion: 1,
+    occurredAt: "2026-10-10T12:00:00.000Z",
+    orderId: "normal-order",
+    customerEmail: "normal@example.test",
+    priority: "normal",
+  });
+  await queue.publish({
+    eventId: "urgent-event",
+    type: "order.accepted",
+    schemaVersion: 1,
+    occurredAt: "2026-10-10T12:00:01.000Z",
+    orderId: "urgent-order",
+    customerEmail: "urgent@example.test",
+    priority: "urgent",
+  });
+
+  const first = await queue.receive();
+  assert.equal(first?.event.orderId, "urgent-order");
+  await queue.acknowledge(first!.receipt);
+
+  const second = await queue.receive();
+  assert.equal(second?.event.orderId, "normal-order");
+  await queue.acknowledge(second!.receipt);
 });
 
 async function waitFor(condition: () => boolean): Promise<void> {

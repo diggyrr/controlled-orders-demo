@@ -1,5 +1,7 @@
 export const ORDER_ACCEPTED_EVENT_TYPE = "order.accepted" as const;
 
+export type OrderPriority = "normal" | "urgent";
+
 /** The event contract shared by the orders API and notification worker. */
 export interface OrderAcceptedEvent {
   eventId: string;
@@ -8,6 +10,7 @@ export interface OrderAcceptedEvent {
   occurredAt: string;
   orderId: string;
   customerEmail: string;
+  priority: OrderPriority;
 }
 
 export function isOrderAcceptedEvent(
@@ -25,6 +28,7 @@ export function isOrderAcceptedEvent(
     event.schemaVersion === 1 &&
     typeof event.occurredAt === "string" &&
     typeof event.orderId === "string" &&
-    typeof event.customerEmail === "string"
+    typeof event.customerEmail === "string" &&
+    (event.priority === "normal" || event.priority === "urgent")
   );
 }
