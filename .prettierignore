@@ -1,0 +1,6 @@
+.scratch/
+.codex/
+CONTEXT.md
+notes.md
+dist/
+node_modules/
