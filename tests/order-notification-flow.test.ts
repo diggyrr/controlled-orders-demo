@@ -9,15 +9,15 @@ import { NotificationWorker } from "../src/notification-worker/notification-work
 import { OrdersApi } from "../src/orders-api/orders-api.js";
 import { FileOrderEventQueue } from "../src/shared/file-order-event-queue.js";
 
-const cleanups: Array<() => Promise<void>> = [];
+const cleanupTasks: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
-  await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
+  await Promise.all(cleanupTasks.splice(0).map((cleanupTask) => cleanupTask()));
 });
 
-test("accepted orders produce an email notification", async () => {
-  const queueDirectory = await mkdtemp(join(tmpdir(), "orders-demo-test-"));
-  const queue = new FileOrderEventQueue(queueDirectory);
+test("submitting an accepted order records an email notification", async () => {
+  const queuePath = await mkdtemp(join(tmpdir(), "orders-demo-test-"));
+  const queue = new FileOrderEventQueue(queuePath);
   const notifications: Notification[] = [];
   const worker = new NotificationWorker(
     queue,
@@ -30,10 +30,10 @@ test("accepted orders produce an email notification", async () => {
   );
   const api = new OrdersApi(queue, { host: "127.0.0.1", port: 0 });
 
-  cleanups.push(async () => {
+  cleanupTasks.push(async () => {
     await api.stop();
     await worker.stop();
-    await rm(queueDirectory, { recursive: true, force: true });
+    await rm(queuePath, { recursive: true, force: true });
   });
 
   worker.start();
@@ -49,7 +49,7 @@ test("accepted orders produce an email notification", async () => {
   });
   const body: unknown = await response.json();
 
-  await waitFor(() => notifications.length === 1);
+  await waitUntil(() => notifications.length === 1);
 
   assert.deepEqual(
     { status: response.status, body, notifications },
@@ -68,14 +68,14 @@ test("accepted orders produce an email notification", async () => {
   );
 });
 
-test("orders require a JSON request", async () => {
-  const queueDirectory = await mkdtemp(join(tmpdir(), "orders-demo-test-"));
-  const queue = new FileOrderEventQueue(queueDirectory);
+test("non-JSON order requests are rejected", async () => {
+  const queuePath = await mkdtemp(join(tmpdir(), "orders-demo-test-"));
+  const queue = new FileOrderEventQueue(queuePath);
   const api = new OrdersApi(queue, { host: "127.0.0.1", port: 0 });
 
-  cleanups.push(async () => {
+  cleanupTasks.push(async () => {
     await api.stop();
-    await rm(queueDirectory, { recursive: true, force: true });
+    await rm(queuePath, { recursive: true, force: true });
   });
 
   const address = await api.start();
@@ -95,12 +95,12 @@ test("orders require a JSON request", async () => {
   );
 });
 
-test("urgent orders are delivered before normal orders", async () => {
-  const queueDirectory = await mkdtemp(join(tmpdir(), "orders-demo-test-"));
-  const queue = new FileOrderEventQueue(queueDirectory);
+test("urgent queue entries precede normal queue entries", async () => {
+  const queuePath = await mkdtemp(join(tmpdir(), "orders-demo-test-"));
+  const queue = new FileOrderEventQueue(queuePath);
 
-  cleanups.push(async () => {
-    await rm(queueDirectory, { recursive: true, force: true });
+  cleanupTasks.push(async () => {
+    await rm(queuePath, { recursive: true, force: true });
   });
 
   await queue.publish({
@@ -131,7 +131,7 @@ test("urgent orders are delivered before normal orders", async () => {
   await queue.acknowledge(second!.receipt);
 });
 
-async function waitFor(condition: () => boolean): Promise<void> {
+async function waitUntil(condition: () => boolean): Promise<void> {
   const deadline = Date.now() + 1_000;
 
   while (!condition()) {
