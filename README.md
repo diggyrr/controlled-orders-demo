@@ -33,3 +33,17 @@ curl -i -X POST http://127.0.0.1:3000/orders \
 Alternatively, copy `.env.example` to `.env` and run the complete two-service
 topology with `docker compose up --build`. The shared queue is local file data;
 no database, cloud service, authentication, or frontend is required.
+
+## Order report
+
+`tools/order_report.py` is a small Python 3.11 command (standard library only)
+that reads the queue directory the orders API writes and reports how many events
+are `ready` or `in-flight`, how many entries are invalid, and the customer email
+domains. It uses `QUEUE_DIRECTORY` (default `.data/queue`) unless given
+`--queue-directory`, and `--json` prints the summary as JSON. It exits with 1
+when any queue entry does not match the `order.accepted` event contract.
+
+```sh
+python tools/order_report.py
+python -m unittest discover -s tests -p 'test_*.py'
+```
