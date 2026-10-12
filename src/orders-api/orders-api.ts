@@ -105,6 +105,7 @@ export class OrdersApi {
       occurredAt: new Date().toISOString(),
       orderId: body.orderId,
       customerEmail: body.customerEmail,
+      priority: body.priority,
     });
 
     const result: CreateOrderResponse = {

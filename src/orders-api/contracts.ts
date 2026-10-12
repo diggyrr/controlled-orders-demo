@@ -1,7 +1,10 @@
+import type { OrderPriority } from "../shared/event-schema.js";
+
 /** JSON body accepted by POST /orders. */
 export interface CreateOrderRequest {
   orderId: string;
   customerEmail: string;
+  priority: OrderPriority;
 }
 
 /** Successful POST /orders response. */
@@ -23,6 +26,7 @@ export function isCreateOrderRequest(
     typeof request.orderId === "string" &&
     request.orderId.length > 0 &&
     typeof request.customerEmail === "string" &&
-    request.customerEmail.includes("@")
+    request.customerEmail.includes("@") &&
+    (request.priority === "normal" || request.priority === "urgent")
   );
 }

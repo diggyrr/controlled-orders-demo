@@ -31,7 +31,8 @@ export class FileOrderEventQueue implements OrderEventQueue {
   public async publish(event: OrderAcceptedEvent): Promise<void> {
     await this.#ensureDirectories();
 
-    const receipt = `${Date.now().toString().padStart(13, "0")}-${event.eventId}.json`;
+    const priorityRank = event.priority === "urgent" ? "0" : "1";
+    const receipt = `${priorityRank}-${Date.now().toString().padStart(13, "0")}-${event.eventId}.json`;
     const temporaryPath = join(this.#readyDirectory, `.${randomUUID()}.tmp`);
 
     await writeFile(temporaryPath, `${JSON.stringify(event)}\n`, {
