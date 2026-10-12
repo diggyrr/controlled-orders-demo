@@ -1,0 +1,6 @@
+[project]
+name = "order-report"
+version = "0.1.0"
+description = "Summarises the orders waiting in the file-backed order queue."
+requires-python = ">=3.11"
+dependencies = []
