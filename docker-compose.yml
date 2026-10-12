@@ -1,0 +1,24 @@
+services:
+  orders-api:
+    build: .
+    command: ["npm", "run", "start:api"]
+    environment:
+      ORDERS_API_HOST: 0.0.0.0
+      ORDERS_API_PORT: 3000
+      QUEUE_DIRECTORY: /data/queue
+    ports:
+      - "${ORDERS_API_PORT:-3000}:3000"
+    volumes:
+      - queue-data:/data/queue
+
+  notification-worker:
+    build: .
+    command: ["npm", "run", "start:worker"]
+    environment:
+      QUEUE_DIRECTORY: /data/queue
+      WORKER_POLL_INTERVAL_MS: "${WORKER_POLL_INTERVAL_MS:-250}"
+    volumes:
+      - queue-data:/data/queue
+
+volumes:
+  queue-data:

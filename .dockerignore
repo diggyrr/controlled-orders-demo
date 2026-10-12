@@ -1,0 +1,6 @@
+.data
+.git
+.scratch
+dist
+node_modules
+notes.md
