@@ -1,0 +1,98 @@
+name: Invoke Documentation Run
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  invoke-documentation-run:
+    if: >-
+      ${{
+        vars.DOCUMENTATION_RUNS_ENABLED == 'true' &&
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.base.ref == github.event.repository.default_branch
+      }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    env:
+      DOCUMENTATION_TRIGGER_URL: ${{ secrets.DOCUMENTATION_TRIGGER_URL }}
+      DOCUMENTATION_TRIGGER_SECRET: ${{ secrets.DOCUMENTATION_TRIGGER_SECRET }}
+      REPOSITORY_NODE_ID: ${{ github.event.repository.node_id }}
+      REPOSITORY_FULL_NAME: ${{ github.event.repository.full_name }}
+      PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+      MERGE_COMMIT_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+    steps:
+      - name: Deliver Documentation Run Request
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${DOCUMENTATION_TRIGGER_URL}" || -z "${DOCUMENTATION_TRIGGER_SECRET}" ]]; then
+            echo "::error::Documentation Run delivery is not configured."
+            exit 1
+          fi
+
+          if [[ "${DOCUMENTATION_TRIGGER_URL}" != https://* ]] ||
+             [[ ! "${DOCUMENTATION_TRIGGER_SECRET}" =~ ^[A-Za-z0-9_-]{43,}$ ]]; then
+            echo "::error::Documentation Run delivery configuration is invalid."
+            exit 1
+          fi
+
+          if [[ ! "${REPOSITORY_NODE_ID}" =~ ^[A-Za-z0-9_-]{1,128}$ ]] ||
+             [[ ! "${REPOSITORY_FULL_NAME}" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$ ]] ||
+             [[ ! "${PULL_REQUEST_NUMBER}" =~ ^[1-9][0-9]*$ ]] ||
+             [[ ! "${MERGE_COMMIT_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::The merged pull-request event is invalid."
+            exit 1
+          fi
+
+          payload="$(
+            jq -cn \
+              --arg repositoryNodeId "${REPOSITORY_NODE_ID}" \
+              --arg repositoryFullName "${REPOSITORY_FULL_NAME}" \
+              --argjson pullRequestNumber "${PULL_REQUEST_NUMBER}" \
+              --arg mergeCommitSha "${MERGE_COMMIT_SHA}" \
+              '{
+                schemaVersion: "1.0",
+                event: "pull_request",
+                action: "closed",
+                repository: {
+                  nodeId: $repositoryNodeId,
+                  fullName: $repositoryFullName
+                },
+                pullRequest: {
+                  number: $pullRequestNumber,
+                  mergeCommitSha: $mergeCommitSha
+                }
+              }'
+          )"
+
+          curl_exit=0
+          http_status="$(
+            curl \
+              --silent \
+              --fail \
+              --output /dev/null \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header 'Content-Type: application/json' \
+              --header "Authorization: Bearer ${DOCUMENTATION_TRIGGER_SECRET}" \
+              --data-binary "${payload}" \
+              --connect-timeout 10 \
+              --max-time 30 \
+              --retry 2 \
+              --retry-delay 2 \
+              --retry-max-time 60 \
+              --retry-connrefused \
+              "${DOCUMENTATION_TRIGGER_URL}" \
+              2>/dev/null
+          )" || curl_exit=$?
+
+          if [[ ${curl_exit} -ne 0 || "${http_status}" != "202" ]]; then
+            echo "::error::Documentation Run delivery failed."
+            exit 1
+          fi
+
+          echo "Documentation Run request accepted for processing."
