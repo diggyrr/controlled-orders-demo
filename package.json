@@ -1,0 +1,27 @@
+{
+  "name": "controlled-orders-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev:api": "node --watch --import tsx src/orders-api/main.ts",
+    "dev:worker": "node --watch --import tsx src/notification-worker/main.ts",
+    "start:api": "node dist/orders-api/main.js",
+    "start:worker": "node dist/notification-worker/main.js",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
